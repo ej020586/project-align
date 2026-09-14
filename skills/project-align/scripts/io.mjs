@@ -55,3 +55,8 @@ export async function optionalJson(file) {
   try { return JSON.parse(await fs.readFile(file, 'utf8')); }
   catch (e) { if (e.code === 'ENOENT') return null; throw e; }
 }
+export async function isMain(moduleUrl) {
+  if (!process.argv[1]) return false;
+  const [moduleFile, entryFile] = await Promise.all([fs.realpath(new URL(moduleUrl)), fs.realpath(process.argv[1])]);
+  return process.platform === 'win32' ? moduleFile.toLowerCase() === entryFile.toLowerCase() : moduleFile === entryFile;
+}

@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { command, repoRoot, githubIdentity, parseArgs, atomicJson, optionalJson, digest } from './io.mjs';
+import { command, repoRoot, githubIdentity, parseArgs, atomicJson, optionalJson, digest, isMain } from './io.mjs';
 
 export function compareSnapshots(previous, current) {
   if (!previous || previous.identity !== current.identity) return { baseline: 'missing-or-different-repository', changed: [], removed: [] };
@@ -70,7 +69,7 @@ export async function collect({ repo = '.', offline = false, audit = false, sinc
   if (previous) result.delta = compareSnapshots(await optionalJson(previous), result);
   return result;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(await fs.realpath(process.argv[1])).href) {
+if (await isMain(import.meta.url)) {
   try {
     const args = parseArgs(process.argv.slice(2), { '--repo': 'string', '--offline': 'boolean', '--audit': 'boolean', '--since': 'string', '--previous': 'string', '--output': 'string' });
     const result = await collect(args);

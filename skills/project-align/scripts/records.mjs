@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { command, repoRoot, githubIdentity, digest, atomicJson, optionalJson, parseArgs } from './io.mjs';
+import { command, repoRoot, githubIdentity, digest, atomicJson, optionalJson, parseArgs, isMain } from './io.mjs';
 
 export function ghClient(identity, root, run = command) {
   const prefix = `repos/${identity}`;
@@ -165,6 +164,6 @@ export async function main(argv) {
     console.log(JSON.stringify(result, null, 2));
   } finally { await lock.close(); await fs.unlink(path.join(stateDir, 'records.lock')); }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(await fs.realpath(process.argv[1])).href) {
+if (await isMain(import.meta.url)) {
   main(process.argv.slice(2)).catch(e => { console.error(e.message); process.exitCode = 1; });
 }
