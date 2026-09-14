@@ -1,0 +1,20 @@
+{
+  "name": "@ej020586/project-align",
+  "version": "0.1.0",
+  "description": "Return to a project with context, trustworthy next steps, and maintained handoffs.",
+  "type": "module",
+  "bin": { "project-align": "cli/project-align.mjs" },
+  "files": ["cli/", "skills/project-align/", "README.md"],
+  "engines": { "node": ">=22.20.0" },
+  "dependencies": { "skills": "1.5.26" },
+  "scripts": {
+    "test": "node --test",
+    "check": "node scripts/check-package.mjs",
+    "prepublishOnly": "npm test && npm run check"
+  },
+  "repository": { "type": "git", "url": "git+https://github.com/ej020586/project-align.git" },
+  "homepage": "https://github.com/ej020586/project-align#readme",
+  "bugs": { "url": "https://github.com/ej020586/project-align/issues" },
+  "publishConfig": { "access": "public" },
+  "license": "UNLICENSED"
+}

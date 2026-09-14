@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Align"
+  short_description: "Return with context and a trustworthy next move"
+  default_prompt: "Use $project-align to restore this project’s context and prepare the next action and decisions."
