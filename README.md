@@ -12,13 +12,19 @@ Install just the self-contained skill with the standard [Skills CLI](https://git
 npx skills add ej020586/project-align --skill project-align --agent codex claude-code cursor --global
 ```
 
-Enroll a repository using the npm CLI **after the package is published**:
+Enroll a repository directly from the versioned GitHub release artifact:
+
+```sh
+npx --yes --package=https://github.com/ej020586/project-align/releases/download/v0.1.0/ej020586-project-align-0.1.0.tgz project-align setup --repo . --agents codex claude-code cursor --global --maintenance
+```
+
+The shorter registry command becomes available **after npm publication**:
 
 ```sh
 npx @ej020586/project-align setup --repo . --agents codex claude-code cursor --global --maintenance
 ```
 
-Check [release evidence](https://github.com/ej020586/project-align/blob/main/docs/release-evidence.md) for the current publication and runtime validation status. A source release does not imply npm publication. Until npm is published, clone this repository, run `npm ci --ignore-scripts`, then use:
+Check [release evidence](https://github.com/ej020586/project-align/blob/main/docs/release-evidence.md) for the current publication and runtime validation status. A GitHub release does not imply npm publication. For source development, clone this repository, run `npm ci --ignore-scripts`, then use:
 
 ```sh
 node cli/project-align.mjs setup --repo /path/to/project --agents codex claude-code cursor --global --maintenance
