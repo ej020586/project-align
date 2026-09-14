@@ -110,10 +110,19 @@ export async function applyPlan(plan, { client, dryRun = false, journal = { entr
       outcomes.push({ id: op.id, state: 'updated', number: op.number, url: readback.url });
     } else {
       const marker = `<!-- project-align:operation:${op.id} -->`;
+      const desired = { title: op.title, body: `${op.body}\n\n${marker}`, ...(op.labels ? { labels: op.labels } : {}) };
+      // Collection endpoints can lag a successful create. Prefer the exact
+      // provider identity already durably recorded over an eventually fresh list.
+      if (previous?.number) {
+        const verified = await client.read(previous.number);
+        if (!matches(verified.record, desired)) throw new Error(`Previously created operation ${op.id} now differs; reconcile before proceeding.`);
+        outcomes.push({ id: op.id, state: 'unchanged', number: previous.number });
+        if (!dryRun && previous.state === 'pending') { journal.entries[op.id] = { ...previous, state: 'verified' }; await persist(journal); }
+        continue;
+      }
       const existing = await client.list();
       const found = existing.filter(i => (i.body ?? '').includes(marker));
       if (found.length > 1) throw new Error(`Multiple records contain operation ${op.id}; reconcile manually.`);
-      const desired = { title: op.title, body: `${op.body}\n\n${marker}`, ...(op.labels ? { labels: op.labels } : {}) };
       if (found.length) {
         const verified = await client.read(found[0].number);
         if (!matches(verified.record, desired)) throw new Error(`Previously created operation ${op.id} now differs; reconcile before proceeding.`);
@@ -126,6 +135,7 @@ export async function applyPlan(plan, { client, dryRun = false, journal = { entr
       if (dryRun) { outcomes.push({ id: op.id, state: 'would-create', title: op.title }); continue; }
       journal.entries[op.id] = { hash, state: 'pending', ...attribution }; await persist(journal);
       const created = await client.create(desired);
+      journal.entries[op.id] = { ...journal.entries[op.id], number: created.number }; await persist(journal);
       const readback = await client.read(created.number);
       if (!matches(readback.record, desired)) throw new Error('Created issue readback differs; resolve the pending operation before retrying.');
       journal.entries[op.id] = { ...journal.entries[op.id], state: 'verified', number: created.number }; await persist(journal);

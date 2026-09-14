@@ -130,6 +130,13 @@ test('create retries find operation marker after uncertain remote success', asyn
   assert.deepEqual(journal.entries['create-1'].evidence, proof);
   assert.equal(f.writes.length, 1);
 });
+test('verified creation uses its provider identity when the issue inventory lags', async () => {
+  const f = fixture(), journal = { entries: {} };
+  await applyPlan(createPlan(), { client: f.client, journal });
+  f.client.list = async () => [];
+  assert.equal((await applyPlan(createPlan(), { client: f.client, journal })).outcomes[0].state, 'unchanged');
+  assert.equal(f.writes.length, 1);
+});
 test('uncertain creation without remote marker does not blindly retry', async () => {
   const f = fixture(), journal = { entries: {} };
   f.client.create = async () => { throw Error('connection lost'); };
