@@ -95,7 +95,7 @@ async function readManifest(root) {
   if (new Set(value.files.map(file => file.path)).size !== value.files.length || new Set(value.agents).size !== value.agents.length || !['assess', 'maintenance'].includes(value.authority)) throw new Error('Invalid enrollment manifest');
   return value;
 }
-async function recover(root, dryRun) {
+async function recover(root, dryRun, home = os.homedir(), env = process.env) {
   const bytes = await managedRead(root, JOURNAL);
   if (!bytes) return false;
   const journal = JSON.parse(bytes);
@@ -111,6 +111,13 @@ async function recover(root, dryRun) {
     let live = false;
     if (Number.isInteger(journal.owner.pid) && journal.owner.pid > 0) { try { process.kill(journal.owner.pid, 0); live = true; } catch (error) { live = error.code === 'EPERM'; } }
     if (live) throw new Error('Another Project Align operation owns the recovery journal and is still running.');
+  }
+  const manifestEdit = journal.edits.find(edit => edit.path === MANIFEST && edit.after !== null);
+  const intended = journal.installation || (manifestEdit ? JSON.parse(decode(manifestEdit.after)) : null);
+  if (intended?.installation?.fingerprint) {
+    for (const item of installedPaths(root, intended.agents, intended.scope === 'global', home, env)) {
+      if (await skillFingerprint(path.dirname(item.path)) !== intended.installation.fingerprint) throw new Error(`Interrupted installation is incomplete or changed: ${item.path}. Guidance has not been recovered; preserve the journal and restore the expected skill before retrying setup.`);
+    }
   }
   if (journal.installationLock) await restoreSkillsLock(root, journal.installationLock);
   for (const edit of journal.edits) {
@@ -129,7 +136,7 @@ async function transaction(root, edits, hooks = {}) {
   for (const edit of edits) if (!equal(await managedRead(root, edit.path), edit.before)) throw new Error(`Concurrent edit: ${edit.path}`);
   const journalPath = await safePath(root, JOURNAL);
   await fs.mkdir(path.dirname(journalPath), { recursive: true });
-  await fs.writeFile(journalPath, JSON.stringify({ version: 1, owner: { pid: process.pid, host: os.hostname() }, edits: edits.map(e => ({ path: e.path, before: encode(e.before), after: encode(e.after) })) }, null, 2), { flag: 'wx', mode: 0o600 });
+  await fs.writeFile(journalPath, JSON.stringify({ version: 1, owner: { pid: process.pid, host: os.hostname() }, ...(hooks.installation ? { installation: hooks.installation } : {}), edits: edits.map(e => ({ path: e.path, before: encode(e.before), after: encode(e.after) })) }, null, 2), { flag: 'wx', mode: 0o600 });
   try {
   await hooks.beforeApply?.();
   for (let index = 0; index < edits.length; index++) {
@@ -148,7 +155,9 @@ async function transaction(root, edits, hooks = {}) {
 }
 export function installedPaths(root, agents, global, home = os.homedir(), env = process.env) {
   return agents.map(agent => {
-    const base = global ? (agent === 'codex' ? (env.CODEX_HOME?.trim() || path.join(home, '.codex')) : agent === 'claude-code' ? (env.CLAUDE_CONFIG_DIR?.trim() || path.join(home, '.claude')) : path.join(home, '.cursor')) : path.join(root, agent === 'claude-code' ? '.claude' : '.agents');
+    // Skills 1.5.26 getAgentBaseDir routes universal agents (Codex and Cursor)
+    // to ~/.agents even though their legacy globalSkillsDir metadata differs.
+    const base = global ? (agent === 'claude-code' ? (env.CLAUDE_CONFIG_DIR?.trim() || path.join(home, '.claude')) : path.join(home, '.agents')) : path.join(root, agent === 'claude-code' ? '.claude' : '.agents');
     return { agent, path: path.join(base, 'skills/project-align/SKILL.md') };
   });
 }
@@ -217,7 +226,7 @@ export async function execute(options, dependencies = {}) {
   const exec = dependencies.exec || run;
   const home = dependencies.home || os.homedir();
   const root = await rootFor(options.repo || '.', exec);
-  const recovery = await recover(root, !!options.dryRun || options.command === 'doctor');
+  const recovery = await recover(root, !!options.dryRun || options.command === 'doctor', home, dependencies.env || process.env);
   if (recovery && options.dryRun && options.command !== 'doctor') return { command: options.command, repo: root, dryRun: true, recoveryPending: true, next: 'Rerun without --dry-run to finish the validated interrupted transaction.' };
   const manifest = await readManifest(root);
   if (options.command === 'doctor') {
@@ -308,6 +317,6 @@ export async function execute(options, dependencies = {}) {
     for (const item of installations) if (await skillFingerprint(path.dirname(item.path)) !== identity.fingerprint) throw new Error(`Skill installation was not verified: ${item.path}. Recovery journal retained.`);
     await dependencies.hooks?.beforeApply?.();
   } : dependencies.hooks?.beforeApply;
-  await transaction(root, edits, { ...dependencies.hooks, beforeApply });
+  await transaction(root, edits, { ...dependencies.hooks, beforeApply, installation: { agents, scope: global ? 'global' : 'project', installation: identity } });
   return result;
 }

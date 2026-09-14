@@ -13,7 +13,7 @@ This file distinguishes script, package, runtime, and user-pilot evidence. Perfo
 ## Remaining evidence
 
 - Cross-platform GitHub Actions matrix: pending initial publication.
-- Claude Code and Cursor in-agent behavior: verification in progress.
+- Claude Code and Cursor read-only runtime checks: both discovered and used the installed skill in a synthetic local project, preserved the assessment-only boundary, and produced grounded next actions. Initial elapsed times were approximately 86 and 35 seconds. Both over-escalated ordinary test-scope choices; the instructions were tightened to keep engineering choices within the existing interface with the agent. These checks do not establish automatic handoff execution.
 - Installation from published GitHub source: pending initial publication.
 - npm publication: blocked by unavailable npm authentication; the proposed scope has not been verified as owned by the publisher.
 - Ten actual user-return sessions and the proposed 50% median-time improvement: not measured.

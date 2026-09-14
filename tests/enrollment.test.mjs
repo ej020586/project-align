@@ -80,8 +80,8 @@ test('global scope uses isolated provided home and each supported runtime destin
   const f = await fixture(t);
   const report = await execute({ ...f.options, global: true }, f.deps);
   assert.ok(report.installations.every(item => item.path.startsWith(f.home)));
-  assert.match(report.installations.find(i => i.agent === 'codex').path, /\.codex/);
-  assert.match(report.installations.find(i => i.agent === 'cursor').path, /\.cursor/);
+  assert.match(report.installations.find(i => i.agent === 'codex').path, /\.agents/);
+  assert.match(report.installations.find(i => i.agent === 'cursor').path, /\.agents/);
   assert.equal((await execute({ command: 'doctor', repo: f.repo }, f.deps)).installations.every(i => i.present), true);
 });
 
@@ -187,4 +187,36 @@ test('real bundled Skills CLI installs complete copies without retaining a machi
   for (const target of new Set(installedPaths(f.repo, f.options.agents, false).map(i => path.dirname(i.path)))) await fs.rm(target, { recursive: true });
   await execute(f.options, dependencies);
   assert.equal(await fs.readFile(path.join(f.repo, 'skills-lock.json'), 'utf8'), original);
+});
+
+test('global universal destinations agree with the actual pinned Skills CLI resolver', async () => {
+  const { createRequire } = await import('node:module');
+  const { runInNewContext } = await import('node:vm');
+  const require = createRequire(import.meta.url);
+  const source = await fs.readFile(path.join(path.dirname(require.resolve('skills/bin/cli.mjs')), '../dist/cli.mjs'), 'utf8');
+  const extract = name => {
+    const start = source.indexOf(`function ${name}(`);
+    assert.ok(start >= 0);
+    return source.slice(start, source.indexOf('\n}', start) + 2);
+  };
+  const home = path.resolve('isolated-example-home');
+  const agents = Object.fromEntries(['codex', 'cursor'].map(agent => {
+    const match = source.match(new RegExp(`(?:${agent}|"${agent}"):\\s*\\{[\\s\\S]*?skillsDir:\\s*"([^"]+)"`));
+    assert.ok(match);
+    return [agent, { skillsDir: match[1], globalSkillsDir: path.join(home, `.${agent}`, 'skills') }];
+  }));
+  const resolver = runInNewContext(`${extract('isUniversalAgent')}\n${extract('getCanonicalSkillsDir')}\n${extract('getAgentBaseDir')}\ngetAgentBaseDir`, { agents, join: path.join, homedir: () => home, AGENTS_DIR$1: '.agents', SKILLS_SUBDIR: 'skills' });
+  for (const agent of ['codex', 'cursor']) {
+    const expected = path.join(resolver(agent, true), 'project-align/SKILL.md');
+    assert.equal(installedPaths('/unused', [agent], true, home, { CODEX_HOME: '/must-not-affect-universal' })[0].path, expected);
+  }
+});
+
+test('recovery cannot enroll guidance when installation did not finish', async t => {
+  const f = await fixture(t);
+  await assert.rejects(execute(f.options, { ...f.deps, install: async () => {} }), /not verified/);
+  await assert.rejects(execute(f.options, f.deps), /installation is incomplete/);
+  await assert.rejects(fs.access(path.join(f.repo, 'AGENTS.md')));
+  await assert.rejects(fs.access(path.join(f.repo, '.project-align/enrollment.json')));
+  assert.ok(await fs.readFile(path.join(f.repo, '.project-align/transaction.json')));
 });
