@@ -13,7 +13,9 @@ test('packed npm artifact installs all runtime copies and preserves a project th
   const npm = process.env.npm_execpath;
   if (!npm) { t.skip('Run via npm test to provide the cross-platform npm entry point.'); return; }
   const run = (bin, args, cwd = source) => execFileSync(bin, args, { cwd, encoding: 'utf8', timeout: 60000, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, DISABLE_TELEMETRY: '1', DO_NOT_TRACK: '1' } });
-  const packed = JSON.parse(run(process.execPath, [npm, 'pack', '--ignore-scripts', '--pack-destination', base, '--json']));
+  const packResult = JSON.parse(run(process.execPath, [npm, 'pack', '--ignore-scripts', '--pack-destination', base, '--json']));
+  const packed = Array.isArray(packResult) ? packResult : Object.values(packResult);
+  assert.equal(packed.length, 1);
   const app = path.join(base, 'installed package');
   await fs.mkdir(app);
   await fs.writeFile(path.join(app, 'package.json'), '{"private":true}');

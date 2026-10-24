@@ -29,7 +29,8 @@ for (const file of await walk(skillRoot)) {
 }
 const skill = await fs.readFile(path.join(skillRoot, 'SKILL.md'), 'utf8');
 if (!/^---\r?\nname: project-align\r?\ndescription: /m.test(skill)) throw Error('Skill discovery frontmatter is missing');
-const packed = JSON.parse(execFileSync(process.execPath, [process.env.npm_execpath, 'pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: root, encoding: 'utf8' }));
+const packResult = JSON.parse(execFileSync(process.execPath, [process.env.npm_execpath, 'pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: root, encoding: 'utf8' }));
+const packed = Array.isArray(packResult) ? packResult : Object.values(packResult);
 for (const { path: name } of packed[0].files) {
   if (!/^(package\.json|README\.md|cli\/|skills\/project-align\/)/.test(name)) throw Error(`Unexpected published artifact: ${name}`);
 }
